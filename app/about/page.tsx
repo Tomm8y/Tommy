@@ -35,7 +35,7 @@ export default function About() {
           <div className="grid md:grid-cols-2 gap-12">
             <div className="space-y-6">
               <p className="text-xl text-gray-300 leading-relaxed">
-                I'm a passionate backend developer with over 2 years of experience building scalable, secure, and
+                I'm a passionate backend developer with over 3 years of experience building scalable, secure, and
                 efficient server-side applications. My journey in software development started with a curiosity about
                 how systems work behind the scenes.
               </p>
@@ -53,7 +53,7 @@ export default function About() {
               <div className="space-y-4">
                 <div className="flex justify-between">
                   <span className="text-gray-300">Experience:</span>
-                  <span className="text-red-400 font-semibold">2+ Years</span>
+                  <span className="text-red-400 font-semibold">3+ Years</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Projects:</span>

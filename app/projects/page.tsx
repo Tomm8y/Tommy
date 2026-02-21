@@ -19,6 +19,14 @@ export default function Projects() {
       features: ["Clean and modern UI built with Tailwind CSS", "Fast performance using Next.js & TypeScript", "Modular component design (Shadcn UI)", "Fully responsive across all devices", "Dark mode support", "Pages for About, Projects, Contact, and more"],
       github: "https://github.com/Tomm8y/Personal-website",
       
+    },        {
+      title: "Terminal-Chat",
+      description:
+        "A ",
+      tech: ["JavaScript"],
+      features: [""],
+      github: "https://github.com/Tomm8y/Terminal-chat",
+      
     },
   ]
 
