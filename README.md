@@ -1,76 +1,285 @@
-# 🌐 Personal Website
+# TommyOS
 
-A modern, responsive personal portfolio built with **Next.js**, **TypeScript**, **Tailwind CSS**, and **Shadcn UI** — designed to showcase your **resume**, **projects**, and **business information** in an elegant and professional way.
+A cyberpunk-themed personal portfolio for **Tommy**, styled as a terminal-driven
+operating system — with a live, real-auth simulated shell called **Owl-OS**, and a
+root-only **Admin** tab that only appears once you've authenticated.
 
----
-
-## 🚀 Demo
-
-👉 [View Live Website](https://tomm8y.ir)
-
----
-
-## ✨ Features
-
-- 🧭 Clean and modern UI built with Tailwind CSS  
-- ⚡️ Fast performance using Next.js & TypeScript  
-- 🎨 Modular component design (Shadcn UI)  
-- 📱 Fully responsive across all devices  
-- 🌗 Dark mode support  
-- 💼 Pages for About, Projects, Contact, and more  
+- **Frontend:** Next.js 14 (App Router, TypeScript), Tailwind CSS
+- **Backend:** Express.js (TypeScript), `express-session`, `bcryptjs`, `helmet`
+- **Deployment:** Docker Compose (self-hosted)
+- **Palette:** monochrome graphite gray + a single purple accent — no pink/magenta,
+  no cyan
+- **Branding:** the owl artwork is used as the nav logo, the Home hero badge, and the
+  site favicon (`frontend/public/owl-logo.jpg`, `frontend/app/icon.jpg`)
 
 ---
 
-## 🛠️ Tech Stack
+## Project structure
 
-| Category | Technology |
-|-----------|-------------|
-| Framework | [Next.js](https://nextjs.org/) |
-| Language | [TypeScript](https://www.typescriptlang.org/) |
-| Styling | [Tailwind CSS](https://tailwindcss.com/) |
-| UI Components | [Shadcn UI](https://ui.shadcn.com/) |
-| Package Manager | npm / pnpm |
-
----
-
-## ⚙️ Getting Started
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/Tomm8y/Personal-website
-cd personal-website
 ```
-### 2. Install dependencies
+tommyos/
+├── frontend/                 Next.js 14 app (App Router, TypeScript, Tailwind)
+│   ├── app/
+│   │   ├── layout.tsx        Root layout — loads fonts at runtime, imports global CSS
+│   │   ├── page.tsx          Entry point, renders <Shell />
+│   │   ├── icon.jpg          Owl artwork, auto-detected by Next.js as the favicon
+│   │   └── globals.css       Design tokens, scanline/glitch/terminal utility classes
+│   ├── public/
+│   │   └── owl-logo.jpg      Owl artwork used in the nav logo and Home hero badge
+│   ├── components/
+│   │   ├── Shell.tsx         Tab state, auth state, page composition
+│   │   ├── Nav.tsx           Nav — Home/About/Projects/Contact/Terminal, +Admin when root
+│   │   ├── BootSequence.tsx  Boot animation shown once on load
+│   │   ├── ScreenEffects.tsx Scanlines / scan bar / vignette overlay
+│   │   ├── GlitchText.tsx    Reusable heading with occasional glitch effect
+│   │   ├── sections/         Home, About, Projects, Contact
+│   │   ├── terminal/         OwlTerminal.tsx — the guest→root auth shell
+│   │   └── admin/            AdminSection.tsx — the root-only tab
+│   ├── lib/api.ts            Fetch client for the backend auth/admin API
+│   └── types/index.ts
+├── backend/                  Express API (TypeScript)
+│   └── src/
+│       ├── index.ts          App entrypoint — helmet, cors, session, routes
+│       ├── config.ts         Env var loading/validation
+│       ├── middleware/requireAuth.ts
+│       ├── routes/auth.ts    POST /api/auth/owl, GET /status, POST /logout
+│       ├── routes/admin.ts   GET /api/admin/status — protected by requireAuth
+│       └── scripts/generate-hash.ts   CLI to hash the admin password
+└── docker-compose.yml
+```
 
-Using npm or pnpm :
+---
+
+## Navigation flow
+
+`Home → About → Projects → Contact → Terminal` (+ `Admin`, only visible once
+authenticated).
+
+The **Enter Portfolio** button on the hero goes to **About** (not Projects) — the
+intended order is: Home → **Enter Portfolio → About** → *View My Projects* →
+Projects → *Get In Touch* → Contact.
+
+---
+
+## How Owl-OS authentication works
+
+1. Clicking the **Terminal** tab drops the user straight into a live shell — there is
+   no landing page or "Enter Terminal" button.
+2. The shell starts in a restricted **guest** session; most commands return
+   `permission denied`.
+3. Typing `sudo owl` starts the auth flow: the shell asks for a password (masked
+   input).
+4. On submit, the frontend calls `POST /api/auth/owl` on the Express backend.
+5. The backend compares the submitted password against a **bcrypt hash** stored in
+   the backend's environment (`ADMIN_PASSWORD_HASH`) using `bcryptjs.compare`.
+6. On success, the backend sets `req.session.isAdmin = true`, which is persisted via
+   an **HttpOnly** session cookie (`owlos.sid`) — the frontend never sees or stores
+   the password or a token, only the cookie set by the browser.
+7. The frontend then reveals a new **Admin** tab in the nav. It wasn't hidden CSS —
+   it simply doesn't exist in the nav's link list until `isAdmin` is true. Clicking
+   it shows:
+   - a **SITE_STATUS** panel pulled live from `GET /api/admin/status` (also
+     protected by `requireAuth`) — real backend uptime, server time, environment,
+     and Node.js version, not placeholder numbers
+   - a small authenticated shell with the same command set as the Owl-OS terminal
+     (`help`, `whoami`, `clear`, `sudo owl` — which now just replies "already
+     authenticated as root")
+   - a **Logout** button
+8. Reloading the page keeps both the session and the Admin tab (checked via
+   `GET /api/auth/status` on load) until the cookie expires or the user logs out.
+   Logging out immediately removes the Admin tab from the nav and returns to Home.
+9. A wrong password increments a simple attempt counter and returns
+   `permission denied`; after 5 failed attempts the endpoint responds `429` for a
+   while.
+
+This mirrors the production design decisions already in use for this project:
+HttpOnly cookie-based sessions (not JWT) for simplicity and security, and
+`bcryptjs` (not `bcrypt`) to avoid native compilation failures on Alpine Linux
+inside Docker.
+
+---
+
+## Local development (without Docker)
+
+### 1. Backend
+
 ```bash
+cd backend
 npm install
-
-pnpm install
+cp .env.example .env
 ```
 
-### 3. Run the development server
+Generate a bcrypt hash for your chosen Owl-OS password:
+
+```bash
+npm run hash -- "your-password-here"
+```
+
+The script prints two versions — **use the right one for how you're running the
+app**:
+- **Local dev (`npm run dev`, no Docker):** use the **raw bcrypt hash**. Node's
+  `dotenv` does not touch `$` characters, so the hash needs to stay exactly as
+  bcrypt produced it.
+- **Docker Compose:** use the **`$$`-escaped version**. Compose's `env_file:`
+  mechanism treats a lone `$` as the start of a shell-style variable and silently
+  corrupts the hash, so it needs the doubled `$$` to survive that substitution.
+
+Mixing these up is a real, easy-to-hit bug — pasting the escaped hash into a local
+`.env` (or vice versa for Docker) makes every login attempt fail with "incorrect
+password" even when you're typing the right one.
+
+Fill in the rest of `backend/.env`:
+
+```
+PORT=4000
+NODE_ENV=development
+SESSION_SECRET=some-long-random-string
+FRONTEND_ORIGIN=http://localhost:3000
+ADMIN_PASSWORD_HASH=<paste the escaped hash here>
+```
+
+Start the API:
+
 ```bash
 npm run dev
 ```
-### 📁 Project Structure
+
+The backend runs at `http://localhost:4000`.
+
+### 2. Frontend
+
 ```bash
-personal-website/
-├── app/
-│   ├── layout.tsx
-│   ├── page.tsx
-│   ├── about/
-│   ├── contact/
-│   └── projects/
-├── components/
-│   ├── ui/
-│   ├── hero.tsx
-│   ├── about.tsx
-│   ├── contact.tsx
-│   ├── projects.tsx
-│   └── skills.tsx
-├── tailwind.config.ts
-├── tsconfig.json
-└── package.json
+cd frontend
+npm install
+cp .env.example .env
 ```
+
+`frontend/.env`:
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:4000
+```
+
+Start the dev server:
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:3000`. Go to the **Terminal** tab, type `sudo owl`, enter the
+password you hashed above, and you should see the Admin Panel unlock.
+
+---
+
+## Running with Docker Compose
+
+Make sure `backend/.env` and `frontend/.env` exist and are filled in (see above —
+this is required, they're not committed to version control).
+
+From the project root:
+
+```bash
+docker compose up --build
+```
+
+- Frontend → `http://localhost:3000`
+- Backend → `http://localhost:4000`
+
+To run in the background:
+
+```bash
+docker compose up --build -d
+```
+
+To stop:
+
+```bash
+docker compose down
+```
+
+### Known Docker gotchas (already accounted for in this setup)
+
+- **`bcryptjs` over `bcrypt`** — avoids native compilation failures on Alpine Linux
+  base images.
+- **Fonts loaded via `<link>` tags at runtime** (in `app/layout.tsx`), not
+  `next/font/google` — `next/font/google` needs network access at *build* time,
+  which fails in an offline/restricted Docker build step.
+- **`$` in the bcrypt hash** — Docker Compose's `env_file` treats a lone `$` as the
+  start of a shell-style variable reference and silently corrupts the hash. Use the
+  `$$`-escaped value the `npm run hash` script prints when the hash is going into a
+  Compose `env_file`; use the raw hash for local (non-Docker) `.env` files, since
+  `dotenv` doesn't unescape `$$` back to `$`.
+- **Docker socket permissions** — if `docker compose` commands fail with a
+  permissions error on Linux, add your user to the `docker` group
+  (`sudo usermod -aG docker $USER`, then log out/in) or prefix commands with `sudo`.
+- **Next.js version** — pinned to `14.2.35` in `frontend/package.json` (not
+  `14.2.5`, which has a known security vulnerability).
+
+---
+
+## Environment variables reference
+
+**`backend/.env`**
+
+| Variable | Description |
+|---|---|
+| `PORT` | Port the Express server listens on (default `4000`) |
+| `NODE_ENV` | `development` or `production` — affects the `secure` cookie flag |
+| `SESSION_SECRET` | Long random string used to sign the session cookie |
+| `FRONTEND_ORIGIN` | Exact origin of the frontend, for CORS + cookies |
+| `ADMIN_PASSWORD_HASH` | bcrypt hash from `npm run hash` — **raw** for local dev, **`$$`-escaped** for Docker Compose |
+
+**`frontend/.env`**
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | Base URL of the backend API |
+
+---
+
+## What's been tested
+
+- `backend`: `tsc --noEmit` and `tsc` build both pass clean.
+- `backend`: full auth flow exercised over HTTP — health check, guest status,
+  wrong password → `401`, correct password → session cookie set, status reflects
+  `authenticated: true`, logout clears the session.
+- `backend`: the new `GET /api/admin/status` route confirmed protected —
+  `401` without a session, real data (`process.uptime()`, server time, Node
+  version, environment) returned once authenticated, `401` again after logout.
+- `backend`: CORS preflight from `http://localhost:3000` confirmed to return
+  `Access-Control-Allow-Credentials: true` — required for the session cookie to
+  work across the frontend/backend origins.
+- `frontend`: `tsc --noEmit` passes clean.
+- `frontend`: `next build` succeeds; `/icon.jpg` is correctly auto-detected as the
+  favicon route by Next.js's file-based metadata convention.
+- `frontend`: verified in the rendered HTML that the owl logo image is present
+  (nav + hero badge), the favicon route responds `200`, and there is no leftover
+  pink/cyan color anywhere in the shipped CSS/markup.
+- Found and fixed during earlier passes: a responsive layout bug in `Nav.tsx`
+  (missing `md:flex-row`) and a raw-vs-`$$`-escaped bcrypt hash mix-up in local
+  vs. Docker `.env` files (see the Docker gotchas section above).
+- Not run in this environment: an actual browser/DOM click-through (no headless
+  browser available here) and `docker compose up` itself (no Docker daemon here).
+  Worth a quick manual pass on your machine after `npm install`.
+
+## Notes
+
+- All animations respect `prefers-reduced-motion`.
+- Layout is responsive down to mobile, with a collapsible nav menu.
+- The failed-attempt counter in `backend/src/routes/auth.ts` is in-memory and
+  per-process — good enough for a single small deployment, but not a substitute for
+  real rate limiting/IP throttling if this is ever exposed more broadly.
+- To change the Owl-OS trigger phrase (currently `sudo owl`), edit the
+  `AUTH_COMMAND` constant in `frontend/components/terminal/OwlTerminal.tsx`. The
+  password itself is never hardcoded anywhere in the frontend — only its bcrypt hash
+  lives on the backend.
+- The Admin tab's mini shell (`frontend/components/admin/AdminSection.tsx`)
+  intentionally mirrors the Owl-OS terminal's command set (`help`, `whoami`,
+  `clear`, `sudo owl`) minus the top-level site tabs, since it's a separate,
+  already-authenticated shell rather than a way to navigate the site.
+- Color palette lives in `frontend/tailwind.config.ts` (`bg`, `panel`, `steel`,
+  `purple`, `ink`) and is mirrored in raw hex in `frontend/app/globals.css` for the
+  handful of effects that need plain CSS (scanlines, glitch, grid floor). To retheme,
+  update both.
+- To swap the owl artwork, replace `frontend/public/owl-logo.jpg` (nav + hero badge)
+  and `frontend/app/icon.jpg` (favicon) with a new image of the same name.
