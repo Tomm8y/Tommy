@@ -1,5 +1,3 @@
-export type Tab = "home" | "about" | "projects" | "contact" | "terminal" | "admin";
-
 export interface OwlAuthResponse {
   success: boolean;
   message: string;

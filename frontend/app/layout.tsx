@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import AppChrome from "@/components/AppChrome";
 
 export const metadata: Metadata = {
   title: "<TOMMY/> — Backend Developer",
@@ -26,7 +27,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-bg text-ink font-mono antialiased overflow-x-hidden">{children}</body>
+      <body className="bg-bg text-ink font-mono antialiased overflow-x-hidden">
+        <AppChrome>{children}</AppChrome>
+      </body>
     </html>
   );
 }

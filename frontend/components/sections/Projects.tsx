@@ -1,9 +1,5 @@
+import Link from "next/link";
 import GlitchText from "@/components/GlitchText";
-import type { Tab } from "@/types";
-
-interface ProjectsProps {
-  onNavigate: (tab: Tab) => void;
-}
 
 interface Project {
   title: string;
@@ -46,7 +42,7 @@ const PROJECTS: Project[] = [
   },
 ];
 
-export default function Projects({ onNavigate }: ProjectsProps) {
+export default function Projects() {
   return (
     <section className="max-w-[1180px] mx-auto px-[5vw] pt-32 pb-24">
       <div className="font-ui text-steel text-sm tracking-[3px] mb-2">// 03_ARCHIVE</div>
@@ -105,12 +101,12 @@ export default function Projects({ onNavigate }: ProjectsProps) {
       </div>
 
       <div className="text-center mt-16">
-        <button
-          onClick={() => onNavigate("contact")}
+        <Link
+          href="/contact"
           className="btn-clip font-ui font-bold tracking-wide text-sm px-8 py-3.5 bg-purple text-bg shadow-[0_0_20px_rgba(139,92,246,0.45)] hover:-translate-y-0.5 hover:shadow-[0_0_30px_rgba(139,92,246,0.7)] transition"
         >
           Get In Touch →
-        </button>
+        </Link>
       </div>
     </section>
   );

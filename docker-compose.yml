@@ -15,6 +15,11 @@ services:
       - "3000:3000"
     env_file:
       - ./frontend/.env
+    environment:
+      # The Next.js *server* reaches the backend over the internal Compose
+      # network (service name "backend"), separate from NEXT_PUBLIC_API_URL,
+      # which the browser uses and must be a publicly reachable address.
+      - INTERNAL_API_URL=http://backend:4000
     depends_on:
       - backend
     restart: unless-stopped

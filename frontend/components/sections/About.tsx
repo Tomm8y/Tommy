@@ -1,9 +1,5 @@
+import Link from "next/link";
 import GlitchText from "@/components/GlitchText";
-import type { Tab } from "@/types";
-
-interface AboutProps {
-  onNavigate: (tab: Tab) => void;
-}
 
 const SKILL_GROUPS: { title: string; skills: { name: string; level: number }[] }[] = [
   {
@@ -28,7 +24,7 @@ const SKILL_GROUPS: { title: string; skills: { name: string; level: number }[] }
   },
 ];
 
-export default function About({ onNavigate }: AboutProps) {
+export default function About() {
   return (
     <section className="max-w-[1180px] mx-auto px-[5vw] pt-32 pb-24">
       <div className="font-ui text-steel text-sm tracking-[3px] mb-2">// 01_PROFILE</div>
@@ -96,12 +92,12 @@ export default function About({ onNavigate }: AboutProps) {
       </div>
 
       <div className="text-center mt-16">
-        <button
-          onClick={() => onNavigate("projects")}
+        <Link
+          href="/projects"
           className="btn-clip font-ui font-bold tracking-wide text-sm px-8 py-3.5 bg-purple text-bg shadow-[0_0_20px_rgba(139,92,246,0.45)] hover:-translate-y-0.5 hover:shadow-[0_0_30px_rgba(139,92,246,0.7)] transition"
         >
           View My Projects →
-        </button>
+        </Link>
       </div>
     </section>
   );

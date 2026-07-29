@@ -20,21 +20,27 @@ root-only **Admin** tab that only appears once you've authenticated.
 tommyos/
 ├── frontend/                 Next.js 14 app (App Router, TypeScript, Tailwind)
 │   ├── app/
-│   │   ├── layout.tsx        Root layout — loads fonts at runtime, imports global CSS
-│   │   ├── page.tsx          Entry point, renders <Shell />
+│   │   ├── layout.tsx        Root layout — loads fonts at runtime, wraps pages in <AppChrome>
+│   │   ├── page.tsx          / (Home)
+│   │   ├── about/page.tsx    /about
+│   │   ├── projects/page.tsx /projects
+│   │   ├── contact/page.tsx  /contact
+│   │   ├── terminal/page.tsx /terminal — Owl-OS shell
+│   │   ├── admin/page.tsx    /admin — root-only
 │   │   ├── icon.jpg          Owl artwork, auto-detected by Next.js as the favicon
 │   │   └── globals.css       Design tokens, scanline/glitch/terminal utility classes
 │   ├── public/
 │   │   └── owl-logo.jpg      Owl artwork used in the nav logo and Home hero badge
 │   ├── components/
-│   │   ├── Shell.tsx         Tab state, auth state, page composition
-│   │   ├── Nav.tsx           Nav — Home/About/Projects/Contact/Terminal, +Admin when root
+│   │   ├── AppChrome.tsx     Persistent boot sequence + effects + nav across every route
+│   │   ├── AuthContext.tsx   React context tracking the Owl-OS session (isAdmin)
+│   │   ├── Nav.tsx           Real <Link>-based nav; shows Admin only when isAdmin
 │   │   ├── BootSequence.tsx  Boot animation shown once on load
 │   │   ├── ScreenEffects.tsx Scanlines / scan bar / vignette overlay
 │   │   ├── GlitchText.tsx    Reusable heading with occasional glitch effect
 │   │   ├── sections/         Home, About, Projects, Contact
 │   │   ├── terminal/         OwlTerminal.tsx — the guest→root auth shell
-│   │   └── admin/            AdminSection.tsx — the root-only tab
+│   │   └── admin/            AdminSection.tsx — the root-only page content
 │   ├── lib/api.ts            Fetch client for the backend auth/admin API
 │   └── types/index.ts
 ├── backend/                  Express API (TypeScript)
@@ -50,14 +56,34 @@ tommyos/
 
 ---
 
-## Navigation flow
+## Navigation
 
-`Home → About → Projects → Contact → Terminal` (+ `Admin`, only visible once
-authenticated).
+Every tab is a real Next.js route with its own URL, navigated via `next/link`
+(`/`, `/about`, `/projects`, `/contact`, `/terminal`, and `/admin` once
+authenticated) — not client-side tab state. `AppChrome` (mounted once in the root
+layout) keeps the boot sequence, scanline/vignette effects, and nav bar persistent
+across every page so they don't replay or flicker on navigation. Because these are
+real route changes, Next.js's built-in scroll restoration resets the page to the
+top on every navigation — no manual scroll handling needed.
 
 The **Enter Portfolio** button on the hero goes to **About** (not Projects) — the
 intended order is: Home → **Enter Portfolio → About** → *View My Projects* →
 Projects → *Get In Touch* → Contact.
+
+`/admin` is protected on the **server**, not just the client: `app/admin/page.tsx`
+is a server component that reads the incoming session cookie, forwards it to the
+backend's `GET /api/auth/status`, and calls Next.js's `notFound()` if there's no
+valid session — so a signed-out visitor going straight to `/admin` gets a real,
+themed `404` (`app/not-found.tsx`), not a flash of admin content followed by a
+redirect. This makes the route `force-dynamic` (server-rendered per request
+instead of static) since it has to check auth on every request. Once inside,
+`AdminSection` still does its own client-side status check as a second layer, in
+case the session expires while the tab is already open — that case still redirects
+back to `/` rather than 404ing on an already-loaded page.
+
+`/admin` is also excluded from search engines: the page sets
+`robots: { index: false, follow: false, nocache: true }` and `app/robots.ts`
+disallows `/admin` in `robots.txt`.
 
 ---
 
@@ -233,7 +259,8 @@ docker compose down
 
 | Variable | Description |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | Base URL of the backend API |
+| `NEXT_PUBLIC_API_URL` | Base URL the **browser** uses to reach the backend API |
+| `INTERNAL_API_URL` | Base URL the **Next.js server** uses to reach the backend when gating `/admin` — Docker Compose sets this automatically to `http://backend:4000`; not needed for local dev |
 
 ---
 
@@ -243,21 +270,30 @@ docker compose down
 - `backend`: full auth flow exercised over HTTP — health check, guest status,
   wrong password → `401`, correct password → session cookie set, status reflects
   `authenticated: true`, logout clears the session.
-- `backend`: the new `GET /api/admin/status` route confirmed protected —
-  `401` without a session, real data (`process.uptime()`, server time, Node
-  version, environment) returned once authenticated, `401` again after logout.
+- `backend`: `GET /api/admin/status` confirmed protected — `401` without a
+  session, real data (`process.uptime()`, server time, Node version, environment)
+  once authenticated, `401` again after logout.
 - `backend`: CORS preflight from `http://localhost:3000` confirmed to return
-  `Access-Control-Allow-Credentials: true` — required for the session cookie to
-  work across the frontend/backend origins.
+  `Access-Control-Allow-Credentials: true`.
 - `frontend`: `tsc --noEmit` passes clean.
-- `frontend`: `next build` succeeds; `/icon.jpg` is correctly auto-detected as the
-  favicon route by Next.js's file-based metadata convention.
-- `frontend`: verified in the rendered HTML that the owl logo image is present
-  (nav + hero badge), the favicon route responds `200`, and there is no leftover
-  pink/cyan color anywhere in the shipped CSS/markup.
-- Found and fixed during earlier passes: a responsive layout bug in `Nav.tsx`
-  (missing `md:flex-row`) and a raw-vs-`$$`-escaped bcrypt hash mix-up in local
-  vs. Docker `.env` files (see the Docker gotchas section above).
+- `frontend`: `next build` succeeds and generates a real static route for every
+  page — `/`, `/about`, `/projects`, `/contact`, `/terminal`, `/admin` — confirmed
+  in the build output and by curling each route for a `200`.
+- `frontend`: confirmed the actual `href` chain in the rendered HTML —
+  Home's Enter Portfolio → `/about`, About's View My Projects → `/projects`,
+  Projects' Get In Touch → `/contact`.
+- `frontend`: verified the owl logo image is present (nav + hero badge), the
+  favicon route responds `200`, and there's no leftover pink/cyan anywhere in the
+  shipped CSS/markup.
+- Found and fixed along the way: a responsive nav layout bug (missing
+  `md:flex-row`), a raw-vs-`$$`-escaped bcrypt hash mix-up between local and
+  Docker `.env` files, and a scroll-position bug from the old single-page
+  tab-switching design — resolved by moving to real routes, which get Next.js's
+  built-in scroll-to-top on navigation for free.
+- `frontend`: verified the `/admin` server-side gate end-to-end — no cookie →
+  `404`, log in via the backend → valid cookie → `/admin` → `200` and actually
+  renders `SITE_STATUS`; a random unknown route also correctly `404`s with the
+  themed not-found page.
 - Not run in this environment: an actual browser/DOM click-through (no headless
   browser available here) and `docker compose up` itself (no Docker daemon here).
   Worth a quick manual pass on your machine after `npm install`.

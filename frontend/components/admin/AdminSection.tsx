@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getAdminStatus, logoutOwl } from "@/lib/api";
+import { useAuth } from "@/components/AuthContext";
 import type { AdminStatusResponse } from "@/types";
-
-interface AdminSectionProps {
-  onLoggedOut: () => void;
-}
 
 interface Line {
   text: string;
@@ -24,7 +22,9 @@ function formatUptime(totalSeconds: number): string {
   return parts.join(" ");
 }
 
-export default function AdminSection({ onLoggedOut }: AdminSectionProps) {
+export default function AdminSection() {
+  const router = useRouter();
+  const { isAdmin, checked, setIsAdmin } = useAuth();
   const [status, setStatus] = useState<AdminStatusResponse | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [lines, setLines] = useState<Line[]>([
@@ -35,13 +35,27 @@ export default function AdminSection({ onLoggedOut }: AdminSectionProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  function bounceHome() {
+    setIsAdmin(false);
+    router.replace("/");
+  }
+
+  // Extra guard for direct/deep links to /admin once the context has finished
+  // its own initial session check.
+  useEffect(() => {
+    if (checked && !isAdmin) {
+      router.replace("/");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checked, isAdmin]);
+
   useEffect(() => {
     let cancelled = false;
     getAdminStatus().then((res) => {
       if (cancelled) return;
       if (!res) {
         setLoadError(true);
-        onLoggedOut();
+        bounceHome();
         return;
       }
       setStatus(res);
@@ -87,7 +101,7 @@ export default function AdminSection({ onLoggedOut }: AdminSectionProps) {
 
   async function handleLogout() {
     await logoutOwl();
-    onLoggedOut();
+    bounceHome();
   }
 
   return (

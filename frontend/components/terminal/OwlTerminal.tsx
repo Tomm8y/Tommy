@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getAuthStatus, loginOwl } from "@/lib/api";
+import { useAuth } from "@/components/AuthContext";
 
 type Mode = "guest" | "password" | "root";
 
@@ -10,14 +12,11 @@ interface Line {
   cls?: "sys" | "err" | "ok";
 }
 
-interface OwlTerminalProps {
-  onAuthChange: (isAdmin: boolean) => void;
-  onOpenAdmin: () => void;
-}
-
 const AUTH_COMMAND = "sudo owl";
 
-export default function OwlTerminal({ onAuthChange, onOpenAdmin }: OwlTerminalProps) {
+export default function OwlTerminal() {
+  const router = useRouter();
+  const { setIsAdmin } = useAuth();
   const [lines, setLines] = useState<Line[]>([
     { text: "OWL-OS [restricted shell] — type 'help' for a list of commands", cls: "sys" },
   ]);
@@ -33,7 +32,7 @@ export default function OwlTerminal({ onAuthChange, onOpenAdmin }: OwlTerminalPr
     getAuthStatus().then((authenticated) => {
       if (authenticated) {
         setMode("root");
-        onAuthChange(true);
+        setIsAdmin(true);
         print("session restored — already authenticated as root.", "sys");
       }
       setChecking(false);
@@ -82,7 +81,7 @@ export default function OwlTerminal({ onAuthChange, onOpenAdmin }: OwlTerminalPr
       print(result.message.toLowerCase(), "ok");
       setMode("root");
       setAttempts(0);
-      onAuthChange(true);
+      setIsAdmin(true);
     } else {
       const next = attempts + 1;
       setAttempts(next);
@@ -171,7 +170,7 @@ export default function OwlTerminal({ onAuthChange, onOpenAdmin }: OwlTerminalPr
         <div className="max-w-[820px] w-full mx-auto mt-6 flex flex-wrap items-center justify-between gap-4 p-5 border border-purple/50 bg-purple/5">
           <p className="text-sm text-ink">root session active — full controls live in the Admin tab.</p>
           <button
-            onClick={onOpenAdmin}
+            onClick={() => router.push("/admin")}
             className="btn-clip flex-none font-ui font-bold text-xs px-5 py-2 bg-purple text-bg hover:shadow-[0_0_20px_rgba(139,92,246,0.5)] transition"
           >
             Open Admin →
